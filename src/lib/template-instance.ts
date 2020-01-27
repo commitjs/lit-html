@@ -16,28 +16,30 @@
  * @module lit-html
  */
 
-import {isCEPolyfill} from './dom.js';
-import {Part} from './part.js';
-import {RenderOptions} from './render-options.js';
-import {TemplateProcessor} from './template-processor.js';
-import {isTemplatePartActive, Template, TemplatePart} from './template.js';
+import { isCEPolyfill } from './dom.js';
+import { Part } from './part.js';
+import { RenderOptions } from './render-options.js';
+import { TemplateProcessor } from './template-processor.js';
+import { isTemplatePartActive, Template, TemplatePart, mark } from './template.js';
 
 /**
  * An instance of a `Template` that can be attached to the DOM and updated
  * with new values.
  */
 export class TemplateInstance {
-  private readonly __parts: Array<Part|undefined> = [];
+  private readonly __parts: Array<Part | undefined> = [];
   readonly processor: TemplateProcessor;
   readonly options: RenderOptions;
   readonly template: Template;
+  readonly context: any;
 
   constructor(
-      template: Template, processor: TemplateProcessor,
-      options: RenderOptions) {
+    template: Template, processor: TemplateProcessor,
+    options: RenderOptions, context?: any) {
     this.template = template;
     this.processor = processor;
     this.options = options;
+    this.context = context;
   }
 
   update(values: readonly unknown[]) {
@@ -95,17 +97,17 @@ export class TemplateInstance {
     // Connect.
 
     const fragment = isCEPolyfill ?
-        this.template.element.content.cloneNode(true) as DocumentFragment :
-        document.importNode(this.template.element.content, true);
+      this.template.element.content.cloneNode(true) as DocumentFragment :
+      document.importNode(this.template.element.content, true);
 
     const stack: Node[] = [];
     const parts = this.template.parts;
     // Edge needs all 4 parameters present; IE11 needs 3rd parameter to be null
     const walker = document.createTreeWalker(
-        fragment,
-        133 /* NodeFilter.SHOW_{ELEMENT|COMMENT|TEXT} */,
-        null,
-        false);
+      fragment,
+      133 /* NodeFilter.SHOW_{ELEMENT|COMMENT|TEXT} */,
+      null,
+      false);
     let partIndex = 0;
     let nodeIndex = 0;
     let part: TemplatePart;
@@ -141,12 +143,21 @@ export class TemplateInstance {
       // We've arrived at our part's node.
       if (part.type === 'node') {
         const textPart =
-            this.processor.handleTextExpression(this.options, part);
+          this.processor.handleTextExpression(this.options, part);
         textPart.insertAfterNode(node!.previousSibling!);
         this.__parts.push(textPart);
       } else {
-        this.__parts.push(...this.processor.handleAttributeExpressions(
-            node as Element, part.name, part.strings, this.options, part));
+        if ((node as any).localName.includes(mark)) {
+          const selector = (node as any).localName.replace(`${mark}-`, '');
+          const ctor = this.context.declarations[selector];
+          if (ctor) {
+            const instance = new ctor();
+            node?.parentNode?.replaceChild(instance, node);
+            node = instance;
+            walker.currentNode = node as any;
+          }
+        }
+        this.__parts.push(...this.processor.handleAttributeExpressions(node as Element, part.name, part.strings, this.options, part));
       }
       partIndex++;
     }

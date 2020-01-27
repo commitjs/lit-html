@@ -15,8 +15,10 @@
 /**
  * @module lit-html
  */
-import {ValueSanitizer} from './parts.js';
-import {TemplateResult} from './template-result.js';
+import { ValueSanitizer } from './parts.js';
+import { TemplateResult } from './template-result.js';
+
+export const mark = `lit-${String(Math.random()).slice(2)}`;
 
 /**
  * An expression marker with embedded unique key to avoid collision with
@@ -51,17 +53,17 @@ export class Template {
     const stack: Node[] = [];
     // Edge needs all 4 parameters present; IE11 needs 3rd parameter to be null
     const walker = document.createTreeWalker(
-        element.content,
-        133 /* NodeFilter.SHOW_{ELEMENT|COMMENT|TEXT} */,
-        null,
-        false);
+      element.content,
+      133 /* NodeFilter.SHOW_{ELEMENT|COMMENT|TEXT} */,
+      null,
+      false);
     // Keeps track of the last index associated with a part. We try to delete
     // unnecessary nodes, but we never want to associate two different parts
     // to the same index. They must have a constant node between.
     let lastPartIndex = 0;
     let index = -1;
     let partIndex = 0;
-    const {strings, values: {length}} = result;
+    const { strings, values: { length } } = result;
     while (partIndex < length) {
       const node = walker.nextNode() as Element | Comment | Text | null;
       if (node === null) {
@@ -77,7 +79,7 @@ export class Template {
       if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
         if ((node as Element).hasAttributes()) {
           const attributes = (node as Element).attributes;
-          const {length} = attributes;
+          const { length } = attributes;
           // Per
           // https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap,
           // attributes are not guaranteed to be returned in document order.
@@ -101,9 +103,9 @@ export class Template {
             // handling. To look up the attribute value we also need to add
             // the suffix.
             const attributeLookupName =
-                name.toLowerCase() + boundAttributeSuffix;
+              name.toLowerCase() + boundAttributeSuffix;
             const attributeValue =
-                (node as Element).getAttribute(attributeLookupName)!;
+              (node as Element).getAttribute(attributeLookupName)!;
             (node as Element).removeAttribute(attributeLookupName);
             const statics = attributeValue.split(markerRegex);
             this.parts.push({
@@ -137,12 +139,12 @@ export class Template {
               const match = lastAttributeNameRegex.exec(s);
               if (match !== null && endsWith(match[2], boundAttributeSuffix)) {
                 s = s.slice(0, match.index) + match[1] +
-                    match[2].slice(0, -boundAttributeSuffix.length) + match[3];
+                  match[2].slice(0, -boundAttributeSuffix.length) + match[3];
               }
               insert = document.createTextNode(s);
             }
             parent.insertBefore(insert, node);
-            this.parts.push({type: 'node', index: ++index});
+            this.parts.push({ type: 'node', index: ++index });
           }
           // If there's no text, we must insert a comment to mark our place.
           // Else, we can trust it will stick around after cloning.
@@ -167,7 +169,7 @@ export class Template {
             parent.insertBefore(createMarker(), node);
           }
           lastPartIndex = index;
-          this.parts.push({type: 'node', index});
+          this.parts.push({ type: 'node', index });
           // If we don't have a nextSibling, keep this node so we have an end.
           // Else, we can remove it to save future costs.
           if (node.nextSibling === null) {
@@ -184,7 +186,7 @@ export class Template {
             // The binding won't work, but subsequent bindings will
             // TODO (justinfagnani): consider whether it's even worth it to
             // make bindings in comments work
-            this.parts.push({type: 'node', index: -1});
+            this.parts.push({ type: 'node', index: -1 });
             partIndex++;
           }
         }
@@ -219,7 +221,7 @@ const endsWith = (str: string, suffix: string): boolean => {
  * TemplateInstance could instead be more careful about which values it gives
  * to Part.update().
  */
-export type TemplatePart = NodeTemplatePart|AttributeTemplatePart;
+export type TemplatePart = NodeTemplatePart | AttributeTemplatePart;
 export interface NodeTemplatePart {
   readonly type: 'node';
   index: number;
@@ -266,5 +268,5 @@ export const createMarker = () => document.createComment('');
  *    * (') then any non-(')
  */
 export const lastAttributeNameRegex =
-    // eslint-disable-next-line no-control-regex
-    /([ \x09\x0a\x0c\x0d])([^\0-\x1F\x7F-\x9F "'>=/]+)([ \x09\x0a\x0c\x0d]*=[ \x09\x0a\x0c\x0d]*(?:[^ \x09\x0a\x0c\x0d"'`<>=]*|"[^"]*|'[^']*))$/;
+  // eslint-disable-next-line no-control-regex
+  /([ \x09\x0a\x0c\x0d])([^\0-\x1F\x7F-\x9F "'>=/]+)([ \x09\x0a\x0c\x0d]*=[ \x09\x0a\x0c\x0d]*(?:[^ \x09\x0a\x0c\x0d"'`<>=]*|"[^"]*|'[^']*))$/;

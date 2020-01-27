@@ -16,11 +16,11 @@
  * @module lit-html
  */
 
-import {reparentNodes} from './dom.js';
-import {TemplateProcessor} from './template-processor.js';
-import {boundAttributeSuffix, lastAttributeNameRegex, marker, nodeMarker} from './template.js';
+import { reparentNodes } from './dom.js';
+import { TemplateProcessor } from './template-processor.js';
+import { boundAttributeSuffix, lastAttributeNameRegex, marker, nodeMarker, mark } from './template.js';
 
-let policy: Pick<TrustedTypePolicy, 'createHTML'>|undefined;
+let policy: Pick<TrustedTypePolicy, 'createHTML'> | undefined;
 
 /**
  * Turns the value to trusted HTML. If the application uses Trusted Types the
@@ -28,16 +28,16 @@ let policy: Pick<TrustedTypePolicy, 'createHTML'>|undefined;
  * sink. If the application doesn't use Trusted Types, the return value is the
  * same as the argument.
  */
-function convertConstantTemplateStringToTrustedHTML(value: string): string|
-    TrustedHTML {
+function convertConstantTemplateStringToTrustedHTML(value: string): string |
+  TrustedHTML {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const w = window as any
   // TrustedTypes have been renamed to trustedTypes
   // (https://github.com/WICG/trusted-types/issues/177)
   const trustedTypes =
-      (w.trustedTypes || w.TrustedTypes) as TrustedTypePolicyFactory;
+    (w.trustedTypes || w.TrustedTypes) as TrustedTypePolicyFactory;
   if (trustedTypes && !policy) {
-    policy = trustedTypes.createPolicy('lit-html', {createHTML: (s) => s});
+    policy = trustedTypes.createPolicy('lit-html', { createHTML: (s) => s });
   }
   return policy ? policy.createHTML(value) : value;
 }
@@ -55,8 +55,8 @@ export class TemplateResult {
   readonly processor: TemplateProcessor;
 
   constructor(
-      strings: TemplateStringsArray, values: readonly unknown[], type: string,
-      processor: TemplateProcessor) {
+    strings: TemplateStringsArray, values: readonly unknown[], type: string,
+    processor: TemplateProcessor) {
     this.strings = strings;
     this.values = values;
     this.type = type;
@@ -95,7 +95,7 @@ export class TemplateResult {
       // comment close. Because <-- can appear in an attribute value there can
       // be false positives.
       isCommentBinding = (commentOpen > -1 || isCommentBinding) &&
-          s.indexOf('-->', commentOpen + 1) === -1;
+        s.indexOf('-->', commentOpen + 1) === -1;
       // Check to see if we have an attribute-like sequence preceding the
       // expression. This can match "name=value" like structures in text,
       // comments, and attribute values, so there can be false-positives.
@@ -112,11 +112,13 @@ export class TemplateResult {
         // $lit$ suffix to the name to opt-out of attribute-specific parsing
         // that IE and Edge do for style and certain SVG attributes.
         html += s.substr(0, attributeMatch.index) + attributeMatch[1] +
-            attributeMatch[2] + boundAttributeSuffix + attributeMatch[3] +
-            marker;
+          attributeMatch[2] + boundAttributeSuffix + attributeMatch[3] +
+          marker;
       }
     }
     html += this.strings[l];
+    html = html.replace(/<(\/?)(\w+(-\w+)+)/g, `<$1${mark}-$2`);
+
     return html;
   }
 
@@ -126,7 +128,7 @@ export class TemplateResult {
     // TODO: validate this when
     // https://github.com/tc39/proposal-array-is-template-object is implemented.
     template.innerHTML =
-        convertConstantTemplateStringToTrustedHTML(this.getHTML()) as string;
+      convertConstantTemplateStringToTrustedHTML(this.getHTML()) as string;
     return template;
   }
 }

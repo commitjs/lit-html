@@ -16,25 +16,25 @@
  * @module lit-html
  */
 
-import {isDirective} from './directive.js';
-import {removeNodes} from './dom.js';
-import {noChange, nothing, Part} from './part.js';
-import {RenderOptions} from './render-options.js';
-import {TemplateInstance} from './template-instance.js';
-import {TemplateResult} from './template-result.js';
-import {AttributeTemplatePart, createMarker, NodeTemplatePart} from './template.js';
+import { isDirective } from './directive.js';
+import { removeNodes } from './dom.js';
+import { noChange, nothing, Part } from './part.js';
+import { RenderOptions } from './render-options.js';
+import { TemplateInstance } from './template-instance.js';
+import { TemplateResult } from './template-result.js';
+import { AttributeTemplatePart, createMarker, NodeTemplatePart } from './template.js';
 
 // https://tc39.github.io/ecma262/#sec-typeof-operator
-export type Primitive = null|undefined|boolean|number|string|symbol|bigint;
+export type Primitive = null | undefined | boolean | number | string | symbol | bigint;
 export const isPrimitive = (value: unknown): value is Primitive => {
   return (
-      value === null ||
-      !(typeof value === 'object' || typeof value === 'function'));
+    value === null ||
+    !(typeof value === 'object' || typeof value === 'function'));
 };
 export const isIterable = (value: unknown): value is Iterable<unknown> => {
   return Array.isArray(value) ||
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      !!(value && (value as any)[Symbol.iterator]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    !!(value && (value as any)[Symbol.iterator]);
 };
 
 /**
@@ -59,7 +59,7 @@ export const isIterable = (value: unknown): value is Iterable<unknown> => {
  * @returns A function that will sanitize this class of writes.
  */
 export type SanitizerFactory =
-    (node: Node, name: string, type: 'property'|'attribute') => ValueSanitizer;
+  (node: Node, name: string, type: 'property' | 'attribute') => ValueSanitizer;
 
 /**
  * A function which can sanitize values that will be written to a specific kind
@@ -76,8 +76,8 @@ export type ValueSanitizer = (value: unknown) => unknown;
 
 const identityFunction: ValueSanitizer = (value: unknown) => value;
 const noopSanitizer: SanitizerFactory =
-    (_node: Node, _name: string, _type: 'property'|'attribute') =>
-        identityFunction;
+  (_node: Node, _name: string, _type: 'property' | 'attribute') =>
+    identityFunction;
 
 /**
  * A global callback used to get a sanitizer for a given field.
@@ -88,8 +88,8 @@ export let sanitizerFactory: SanitizerFactory = noopSanitizer;
 export const setSanitizerFactory = (newSanitizer: SanitizerFactory) => {
   if (sanitizerFactory !== noopSanitizer) {
     throw new Error(
-        `Attempted to overwrite existing lit-html security policy.` +
-        ` setSanitizeDOMValueFactory should be called at most once.`);
+      `Attempted to overwrite existing lit-html security policy.` +
+      ` setSanitizeDOMValueFactory should be called at most once.`);
   }
   sanitizerFactory = newSanitizer;
 };
@@ -116,10 +116,10 @@ export class AttributeCommitter {
   dirty = true;
 
   constructor(
-      element: Element, name: string, strings: readonly string[],
-      // Next breaking change, consider making this param required.
-      templatePart?: AttributeTemplatePart,
-      kind: 'property'|'attribute' = 'attribute') {
+    element: Element, name: string, strings: readonly string[],
+    // Next breaking change, consider making this param required.
+    templatePart?: AttributeTemplatePart,
+    kind: 'property' | 'attribute' = 'attribute') {
     this.element = element;
     this.name = name;
     this.strings = strings;
@@ -163,7 +163,7 @@ export class AttributeCommitter {
     // This also allows trusted values (when using TrustedTypes) being
     // assigned to DOM sinks without being stringified in the process.
     if (l === 1 && strings[0] === '' && strings[1] === '' &&
-        parts[0] !== undefined) {
+      parts[0] !== undefined) {
       const v = parts[0].value;
       if (!isIterable(v)) {
         return v;
@@ -253,7 +253,7 @@ export class NodePart implements Part {
   startNode!: Node;
   endNode!: Node;
   value: unknown = undefined;
-  readonly templatePart: NodeTemplatePart|undefined;
+  readonly templatePart: NodeTemplatePart | undefined;
   private __pendingValue: unknown = undefined;
   /**
    * The sanitizer to use when writing text contents into this NodePart.
@@ -263,10 +263,10 @@ export class NodePart implements Part {
    * it's written. e.g. the same text has different security requirements
    * when a child of a <script> vs a <style> vs a <div>.
    */
-  private textSanitizer: ValueSanitizer|undefined = undefined;
+  private textSanitizer: ValueSanitizer | undefined = undefined;
 
   constructor(
-      options: RenderOptions, templatePart?: NodeTemplatePart|undefined) {
+    options: RenderOptions, templatePart?: NodeTemplatePart | undefined) {
     this.options = options;
     this.templatePart = templatePart;
   }
@@ -318,6 +318,50 @@ export class NodePart implements Part {
     this.__pendingValue = value;
   }
 
+  getCommitFn(context: any) {
+    const value = this.__pendingValue as any;
+    const template = this.options.templateFactory(value);
+    if (this.value instanceof TemplateInstance &&
+      this.value.template === template) {
+      return () => {
+        (this.value as any).update(value.values);
+      }
+    } else {
+      // `value` is a template result that was constructed without knowledge of
+      // the parent we're about to write it into. sanitizeDOMValue hasn't been
+      // made aware of this relationship, and for scripts and style specifically
+      // this is known to be unsafe. So in the case where the user is in
+      // "secure mode" (i.e. when there's a sanitizeDOMValue set), we just want
+      // to forbid this because it's not a use case we want to support.
+      // We only apply this policy when sanitizerFactory has been set to
+      // prevent this from being a breaking change to the library.
+      // const parent = this.endNode.parentNode!;
+
+      // TODO: FIX LATER :)
+      // if (sanitizerFactory !== noopSanitizer && parent.nodeName === 'STYLE' ||
+      //   parent.nodeName === 'SCRIPT') {
+      //   this.__commitText(
+      //     '/* lit-html will not write ' +
+      //     'TemplateResults to scripts and styles */');
+      //   return;
+      // }
+
+
+      // Make sure we propagate the template processor from the TemplateResult
+      // so that we use its syntax extension, etc. The template factory comes
+      // from the render function options so that it can control template
+      // caching and preprocessing.
+      const instance =
+        new TemplateInstance(template, value.processor, this.options, context);
+      const fragment = instance._clone();
+      instance.update(value.values);
+      return () => {
+        this.__commitNode(fragment);
+        this.value = instance;
+      }
+    }
+  }
+
   commit() {
     if (this.startNode.parentNode === null) {
       return;
@@ -367,7 +411,7 @@ export class NodePart implements Part {
     const node = this.startNode.nextSibling!;
     value = value == null ? '' : value;
     if (node === this.endNode.previousSibling &&
-        node.nodeType === 3 /* Node.TEXT_NODE */) {
+      node.nodeType === 3 /* Node.TEXT_NODE */) {
       // If we only have a single text node between the markers, we can just
       // set its value, rather than replacing it.
       if (this.textSanitizer === undefined) {
@@ -375,8 +419,8 @@ export class NodePart implements Part {
       }
       const renderedValue = this.textSanitizer(value);
       (node as Text).data = typeof renderedValue === 'string' ?
-          renderedValue :
-          String(renderedValue);
+        renderedValue :
+        String(renderedValue);
     } else {
       // When setting text content, for security purposes it matters a lot what
       // the parent is. For example, <style> and <script> need to be handled
@@ -389,7 +433,7 @@ export class NodePart implements Part {
       }
       const renderedValue = this.textSanitizer(value) as string;
       textNode.data = typeof renderedValue === 'string' ? renderedValue :
-                                                          String(renderedValue);
+        String(renderedValue);
     }
     this.value = value;
   }
@@ -397,7 +441,7 @@ export class NodePart implements Part {
   private __commitTemplateResult(value: TemplateResult): void {
     const template = this.options.templateFactory(value);
     if (this.value instanceof TemplateInstance &&
-        this.value.template === template) {
+      this.value.template === template) {
       this.value.update(value.values);
     } else {
       // `value` is a template result that was constructed without knowledge of
@@ -410,10 +454,10 @@ export class NodePart implements Part {
       // prevent this from being a breaking change to the library.
       const parent = this.endNode.parentNode!;
       if (sanitizerFactory !== noopSanitizer && parent.nodeName === 'STYLE' ||
-          parent.nodeName === 'SCRIPT') {
+        parent.nodeName === 'SCRIPT') {
         this.__commitText(
-            '/* lit-html will not write ' +
-            'TemplateResults to scripts and styles */');
+          '/* lit-html will not write ' +
+          'TemplateResults to scripts and styles */');
         return;
       }
       // Make sure we propagate the template processor from the TemplateResult
@@ -421,7 +465,7 @@ export class NodePart implements Part {
       // from the render function options so that it can control template
       // caching and preprocessing.
       const instance =
-          new TemplateInstance(template, value.processor, this.options);
+        new TemplateInstance(template, value.processor, this.options);
       const fragment = instance._clone();
       instance.update(value.values);
       this.__commitNode(fragment);
@@ -449,7 +493,7 @@ export class NodePart implements Part {
     // items from a previous render
     const itemParts = this.value as NodePart[];
     let partIndex = 0;
-    let itemPart: NodePart|undefined;
+    let itemPart: NodePart | undefined;
 
     for (const item of value) {
       // Try to reuse an existing part
@@ -479,7 +523,7 @@ export class NodePart implements Part {
 
   clear(startNode: Node = this.startNode) {
     removeNodes(
-        this.startNode.parentNode!, startNode.nextSibling!, this.endNode);
+      this.startNode.parentNode!, startNode.nextSibling!, this.endNode);
   }
 }
 
@@ -500,7 +544,7 @@ export class BooleanAttributePart implements Part {
   constructor(element: Element, name: string, strings: readonly string[]) {
     if (strings.length !== 2 || strings[0] !== '' || strings[1] !== '') {
       throw new Error(
-          'Boolean attributes can only contain a single expression');
+        'Boolean attributes can only contain a single expression');
     }
     this.element = element;
     this.name = name;
@@ -546,12 +590,12 @@ export class PropertyCommitter extends AttributeCommitter {
   readonly single: boolean;
 
   constructor(
-      element: Element, name: string, strings: readonly string[],
-      // Next breaking change, consider making this param required.
-      templatePart?: AttributeTemplatePart) {
+    element: Element, name: string, strings: readonly string[],
+    // Next breaking change, consider making this param required.
+    templatePart?: AttributeTemplatePart) {
     super(element, name, strings, templatePart, 'property');
     this.single =
-        (strings.length === 2 && strings[0] === '' && strings[1] === '');
+      (strings.length === 2 && strings[0] === '' && strings[1] === '');
   }
 
   protected _createPart(): PropertyPart {
@@ -576,7 +620,7 @@ export class PropertyCommitter extends AttributeCommitter {
   }
 }
 
-export class PropertyPart extends AttributePart {}
+export class PropertyPart extends AttributePart { }
 
 // Detect event listener options support. If the `capture` property is read
 // from the options object, then options are supported. If not, then the third
@@ -604,14 +648,14 @@ let eventOptionsSupported = false;
 })();
 
 type EventHandlerWithOptions =
-    EventListenerOrEventListenerObject&Partial<AddEventListenerOptions>;
+  EventListenerOrEventListenerObject & Partial<AddEventListenerOptions>;
 export class EventPart implements Part {
   readonly element: Element;
   readonly eventName: string;
   readonly eventContext?: EventTarget;
-  value: undefined|EventHandlerWithOptions = undefined;
+  value: undefined | EventHandlerWithOptions = undefined;
   private __options?: AddEventListenerOptions;
-  private __pendingValue: undefined|EventHandlerWithOptions = undefined;
+  private __pendingValue: undefined | EventHandlerWithOptions = undefined;
   private readonly __boundHandleEvent: (event: Event) => void;
 
   constructor(element: Element, eventName: string, eventContext?: EventTarget) {
@@ -621,7 +665,7 @@ export class EventPart implements Part {
     this.__boundHandleEvent = (e) => this.handleEvent(e);
   }
 
-  setValue(value: undefined|EventHandlerWithOptions): void {
+  setValue(value: undefined | EventHandlerWithOptions): void {
     this.__pendingValue = value;
   }
 
@@ -638,21 +682,21 @@ export class EventPart implements Part {
     const newListener = this.__pendingValue;
     const oldListener = this.value;
     const shouldRemoveListener = newListener == null ||
-        oldListener != null &&
-            (newListener.capture !== oldListener.capture ||
-             newListener.once !== oldListener.once ||
-             newListener.passive !== oldListener.passive);
+      oldListener != null &&
+      (newListener.capture !== oldListener.capture ||
+        newListener.once !== oldListener.once ||
+        newListener.passive !== oldListener.passive);
     const shouldAddListener =
-        newListener != null && (oldListener == null || shouldRemoveListener);
+      newListener != null && (oldListener == null || shouldRemoveListener);
 
     if (shouldRemoveListener) {
       this.element.removeEventListener(
-          this.eventName, this.__boundHandleEvent, this.__options);
+        this.eventName, this.__boundHandleEvent, this.__options);
     }
     if (shouldAddListener) {
       this.__options = getOptions(newListener);
       this.element.addEventListener(
-          this.eventName, this.__boundHandleEvent, this.__options);
+        this.eventName, this.__boundHandleEvent, this.__options);
     }
     this.value = newListener;
     this.__pendingValue = noChange as EventHandlerWithOptions;
@@ -670,7 +714,7 @@ export class EventPart implements Part {
 // We copy options because of the inconsistent behavior of browsers when reading
 // the third argument of add/removeEventListener. IE11 doesn't support options
 // at all. Chrome 41 only reads `capture` if the argument is an object.
-const getOptions = (o: AddEventListenerOptions|undefined) => o &&
-    (eventOptionsSupported ?
-         {capture: o.capture, passive: o.passive, once: o.once} :
-         o.capture as AddEventListenerOptions);
+const getOptions = (o: AddEventListenerOptions | undefined) => o &&
+  (eventOptionsSupported ?
+    { capture: o.capture, passive: o.passive, once: o.once } :
+    o.capture as AddEventListenerOptions);
