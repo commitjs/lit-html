@@ -42,6 +42,17 @@ export class TemplateInstance {
     this.context = context;
   }
 
+  updateWithoutCommit(values: readonly unknown[]) {
+    let i = 0;
+    for (const part of this.__parts) {
+      if (part !== undefined) {
+        part.setValue(values[i]);
+      }
+      i++;
+    }
+    return this.__parts;
+  }
+
   update(values: readonly unknown[]) {
     let i = 0;
     for (const part of this.__parts) {

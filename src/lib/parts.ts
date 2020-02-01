@@ -323,8 +323,11 @@ export class NodePart implements Part {
     const template = this.options.templateFactory(value);
     if (this.value instanceof TemplateInstance &&
       this.value.template === template) {
+      const parts = this.value.updateWithoutCommit(value.values);
       return () => {
-        (this.value as any).update(value.values);
+        for (const part of parts) {
+          if (part !== undefined) { part.commit(); }
+        }
       }
     } else {
       // `value` is a template result that was constructed without knowledge of
@@ -354,8 +357,11 @@ export class NodePart implements Part {
       const instance =
         new TemplateInstance(template, value.processor, this.options, context);
       const fragment = instance._clone();
-      instance.update(value.values);
+      const parts = instance.updateWithoutCommit(value.values);
       return () => {
+        for (const part of parts) {
+          if (part !== undefined) { part.commit(); }
+        }
         this.__commitNode(fragment);
         this.value = instance;
       }
