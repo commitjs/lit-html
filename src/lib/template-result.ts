@@ -19,6 +19,7 @@
 import { reparentNodes } from './dom.js';
 import { TemplateProcessor } from './template-processor.js';
 import { boundAttributeSuffix, lastAttributeNameRegex, marker, nodeMarker, mark } from './template.js';
+import { customElementsOpeningAndClosing } from './utils.js';
 
 let policy: Pick<TrustedTypePolicy, 'createHTML'> | undefined;
 
@@ -117,7 +118,7 @@ export class TemplateResult {
       }
     }
     html += this.strings[l];
-    html = html.replace(/<(\/?)(\w+(-\w+)+)/g, `<$1${mark}-$2`);
+    html = html.replace(customElementsOpeningAndClosing, `<$1${mark}-$2`);
 
     return html;
   }

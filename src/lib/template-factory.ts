@@ -16,8 +16,8 @@
  * @module lit-html
  */
 
-import {TemplateResult} from './template-result.js';
-import {marker, Template} from './template.js';
+import { TemplateResult } from './template-result.js';
+import { marker, Template } from './template.js';
 
 /**
  * A function type that creates a Template from a TemplateResult.
@@ -39,13 +39,13 @@ import {marker, Template} from './template.js';
  * to render() so that values are interpolated to the correct place in the
  * template instances.
  */
-export type TemplateFactory = (result: TemplateResult) => Template;
+export type TemplateFactory = (result: TemplateResult, context?: any) => Template;
 
 /**
  * The default TemplateFactory which caches Templates keyed on
  * result.type and result.strings.
  */
-export function templateFactory(result: TemplateResult) {
+export function templateFactory(result: TemplateResult, context?: any) {
   let templateCache = templateCaches.get(result.type);
   if (templateCache === undefined) {
     templateCache = {
@@ -68,7 +68,7 @@ export function templateFactory(result: TemplateResult) {
   template = templateCache.keyString.get(key);
   if (template === undefined) {
     // If we have not seen this key before, create a new Template
-    template = new Template(result, result.getTemplateElement());
+    template = new Template(result, result.getTemplateElement(), context);
     // Cache the Template for this key
     templateCache.keyString.set(key, template);
   }

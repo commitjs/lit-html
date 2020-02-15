@@ -17,6 +17,7 @@
  */
 import { ValueSanitizer } from './parts.js';
 import { TemplateResult } from './template-result.js';
+import { customElementClosingTagRegex } from './utils.js';
 
 export const mark = `lit-${String(Math.random()).slice(2)}`;
 
@@ -46,7 +47,7 @@ export class Template {
   readonly parts: TemplatePart[] = [];
   readonly element: HTMLTemplateElement;
 
-  constructor(result: TemplateResult, element: HTMLTemplateElement) {
+  constructor(result: TemplateResult, element: HTMLTemplateElement, private context?: { declarations: any }) {
     this.element = element;
 
     const nodesToRemove: Node[] = [];
@@ -64,8 +65,9 @@ export class Template {
     let index = -1;
     let partIndex = 0;
     const { strings, values: { length } } = result;
-    while (partIndex < length) {
-      const node = walker.nextNode() as Element | Comment | Text | null;
+    let customElementsCount = strings.join('').match(customElementClosingTagRegex)?.length || 0;
+    while (partIndex < length + customElementsCount) {
+      let node = walker.nextNode() as Element | Comment | Text | null;
       if (node === null) {
         // We've exhausted the content inside a nested template element.
         // Because we still have parts (the outer for-loop), we know:
@@ -74,9 +76,32 @@ export class Template {
         walker.currentNode = stack.pop()!;
         continue;
       }
+      const isCustomElement = node.nodeType === 1 && (node as any).localName.includes(mark);
       index++;
 
       if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
+        // let oldNode = null;
+        if (isCustomElement && this.context) {
+          customElementsCount--;
+          const selector = (node as any).localName.replace(`${mark}-`, '');
+          const ctor = this.context.declarations[selector];
+          if (!ctor && !customElements.get(selector)) {
+            throw new Error(`Make sure that you've added ${selector} into declarations!`);
+          }
+          const instance = new ctor();
+          const oldNode = node;
+          node?.parentNode?.replaceChild(instance, node);
+          (instance as Element).textContent = (oldNode as Element).innerHTML;
+          const attributes = (oldNode as Element).attributes;
+          for (let i = 0; i < attributes.length; i++) {
+            const attr = attributes[i];
+            (oldNode as Element).removeAttributeNode(attr);
+            (instance as Element).setAttributeNode(attr);
+          }
+          // instance.attributes = attributes;
+          node = instance as Element;
+          walker.currentNode = node;
+        }
         if ((node as Element).hasAttributes()) {
           const attributes = (node as Element).attributes;
           const { length } = attributes;

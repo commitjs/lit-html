@@ -20,7 +20,9 @@ import { isCEPolyfill } from './dom.js';
 import { Part } from './part.js';
 import { RenderOptions } from './render-options.js';
 import { TemplateProcessor } from './template-processor.js';
-import { isTemplatePartActive, Template, TemplatePart, mark } from './template.js';
+import { isTemplatePartActive, Template, TemplatePart } from './template.js';
+// import { customElementClosingTagRegex } from './utils.js';
+
 
 /**
  * An instance of a `Template` that can be attached to the DOM and updated
@@ -158,20 +160,11 @@ export class TemplateInstance {
         textPart.insertAfterNode(node!.previousSibling!);
         this.__parts.push(textPart);
       } else {
-        if ((node as any).localName.includes(mark)) {
-          const selector = (node as any).localName.replace(`${mark}-`, '');
-          const ctor = this.context.declarations[selector];
-          if (ctor) {
-            const instance = new ctor();
-            node?.parentNode?.replaceChild(instance, node);
-            node = instance;
-            walker.currentNode = node as any;
-          }
-        }
         this.__parts.push(...this.processor.handleAttributeExpressions(node as Element, part.name, part.strings, this.options, part));
       }
       partIndex++;
     }
+
 
     if (isCEPolyfill) {
       document.adoptNode(fragment);
