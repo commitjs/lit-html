@@ -20,7 +20,8 @@ import { isCEPolyfill } from './dom.js';
 import { Part } from './part.js';
 import { RenderOptions } from './render-options.js';
 import { TemplateProcessor } from './template-processor.js';
-import { isTemplatePartActive, Template, TemplatePart } from './template.js';
+import { isTemplatePartActive, Template, TemplatePart, mark } from './template.js';
+import { customElementOpeningTagRe } from './utils.js';
 // import { customElementClosingTagRegex } from './utils.js';
 
 
@@ -125,10 +126,13 @@ export class TemplateInstance {
     let nodeIndex = 0;
     let part: TemplatePart;
     let node = walker.nextNode();
+
+    let customElementsCount = this.template.element.innerHTML.match(customElementOpeningTagRe)?.length || 0;
+
     // Loop through all the nodes and parts of a template
-    while (partIndex < parts.length) {
+    while (partIndex < parts.length + customElementsCount) {
       part = parts[partIndex];
-      if (!isTemplatePartActive(part)) {
+      if (part && !isTemplatePartActive(part)) {
         this.__parts.push(undefined);
         partIndex++;
         continue;
@@ -137,7 +141,7 @@ export class TemplateInstance {
       // Progress the tree walker until we find our next part's node.
       // Note that multiple parts may share the same node (attribute parts
       // on a single element), so this loop may not run at all.
-      while (nodeIndex < part.index) {
+      while (part && nodeIndex < part.index) {
         nodeIndex++;
         if (node!.nodeName === 'TEMPLATE') {
           stack.push(node!);
@@ -152,17 +156,45 @@ export class TemplateInstance {
           node = walker.nextNode();
         }
       }
+      if (!part) {
+        node = walker.nextNode();
+      }
+
+      const isCustomElement = node?.nodeType === 1 && (node as any).localName.includes(mark);
+      if (isCustomElement && this.context) {
+        customElementsCount--;
+
+        const selector = (node as any).localName.replace(`${mark}-`, '');
+        const ctor = this.context.declarations[selector];
+        if (!ctor && !customElements.get(selector)) {
+          throw new Error(`Make sure that you've added ${selector} into declarations!`);
+        }
+        const instance = new ctor(this.context);
+        const oldNode = node;
+        node?.parentNode?.replaceChild(instance, node);
+        (instance as Element).textContent = (oldNode as Element).innerHTML;
+        const attributes = (oldNode as Element).attributes;
+        for (let i = 0; i < attributes.length; i++) {
+          const attr = attributes[i];
+          (oldNode as Element).removeAttributeNode(attr);
+          (instance as Element).setAttributeNode(attr);
+        }
+        node = instance as Element;
+        walker.currentNode = node;
+      }
 
       // We've arrived at our part's node.
-      if (part.type === 'node') {
+      if (part && part.type === 'node') {
         const textPart =
           this.processor.handleTextExpression(this.options, part);
         textPart.insertAfterNode(node!.previousSibling!);
         this.__parts.push(textPart);
-      } else {
+        partIndex++;
+      } else if (part) {
         this.__parts.push(...this.processor.handleAttributeExpressions(node as Element, part.name, part.strings, this.options, part));
+        partIndex++;
       }
-      partIndex++;
+
     }
 
 

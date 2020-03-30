@@ -39,13 +39,13 @@ import { marker, Template } from './template.js';
  * to render() so that values are interpolated to the correct place in the
  * template instances.
  */
-export type TemplateFactory = (result: TemplateResult, context?: any) => Template;
+export type TemplateFactory = (result: TemplateResult) => Template;
 
 /**
  * The default TemplateFactory which caches Templates keyed on
  * result.type and result.strings.
  */
-export function templateFactory(result: TemplateResult, context?: any) {
+export function templateFactory(result: TemplateResult) {
   let templateCache = templateCaches.get(result.type);
   if (templateCache === undefined) {
     templateCache = {
@@ -68,7 +68,7 @@ export function templateFactory(result: TemplateResult, context?: any) {
   template = templateCache.keyString.get(key);
   if (template === undefined) {
     // If we have not seen this key before, create a new Template
-    template = new Template(result, result.getTemplateElement(), context);
+    template = new Template(result, result.getTemplateElement());
     // Cache the Template for this key
     templateCache.keyString.set(key, template);
   }

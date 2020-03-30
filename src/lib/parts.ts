@@ -320,7 +320,7 @@ export class NodePart implements Part {
 
   getCommitFn(context: any) {
     const value = this.__pendingValue as any;
-    const template = this.options.templateFactory(value, context);
+    const template = this.options.templateFactory(value);
     if (this.value instanceof TemplateInstance &&
       this.value.template === template) {
       const parts = this.value.updateWithoutCommit(value.values);
